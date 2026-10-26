@@ -40,3 +40,17 @@ $ kubectl -n istio-system get svc istio-ingressgateway
 The above will display the IP address of the Istio gateway.
 
 **NOTE** The Instana agent only works with later versions of Istio.
+
+## Capstone 2 Observability Work
+
+Local Capstone 2 configuration and submission materials are in [`observability/`](./observability/) and [`../SUBMISSION.md`](../SUBMISSION.md):
+
+- [Brief-based completion checklist](./observability/docs/capstone-checklist.md)
+- [Observability install and verification guide](./observability/README.md)
+- [Availability SLO and error-budget policy](./observability/docs/availability-slo.md)
+- [Incident drill plan](./observability/docs/incident-drill-plan.md)
+- [Availability alert runbook](./observability/runbooks/robot-shop-availability.md)
+- [Read-only database/broker diagnosis](./observability/docs/runtime-diagnostics.md)
+- [Postmortem template](./observability/templates/postmortem.md)
+
+The monitoring, logging, tracing, and alert files are local configuration, not proof that services are deployed or healthy. The assignment requires the instructor's OpenTelemetry Collector configuration; it was not found in the workspace and must not be replaced. Complete the postmortem only after the instructor-led incident drill.

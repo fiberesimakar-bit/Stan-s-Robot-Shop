@@ -10,6 +10,7 @@ import json
 import requests
 import traceback
 from flask import Flask
+from flask import g
 from flask import Response
 from flask import request
 from flask import jsonify
@@ -30,6 +31,32 @@ PromMetrics = {}
 PromMetrics['SOLD_COUNTER'] = Counter('sold_count', 'Running count of items sold')
 PromMetrics['AUS'] = Histogram('units_sold', 'Avergae Unit Sale', buckets=(1, 2, 5, 10, 100))
 PromMetrics['AVS'] = Histogram('cart_value', 'Avergae Value Sale', buckets=(100, 200, 500, 1000, 2000, 5000, 10000))
+PromMetrics['HTTP_REQUESTS'] = Counter(
+    'http_requests_total',
+    'Total HTTP requests handled by payment',
+    ('service', 'method', 'route', 'status_code')
+)
+PromMetrics['HTTP_REQUEST_DURATION'] = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration in seconds for payment',
+    ('service', 'method', 'route', 'status_code'),
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5)
+)
+
+
+@app.before_request
+def start_request_timer():
+    g.prometheus_request_start = time.perf_counter()
+
+
+@app.after_request
+def record_http_metrics(response):
+    route = request.url_rule.rule if request.url_rule else 'unmatched'
+    labels = ('payment', request.method, route, str(response.status_code))
+    duration = time.perf_counter() - g.prometheus_request_start
+    PromMetrics['HTTP_REQUESTS'].labels(*labels).inc()
+    PromMetrics['HTTP_REQUEST_DURATION'].labels(*labels).observe(duration)
+    return response
 
 
 @app.errorhandler(Exception)

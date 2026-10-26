@@ -1,0 +1,52 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: robot-shop-availability
+  namespace: monitoring
+  labels:
+    team: robot-shop
+spec:
+  groups:
+    - name: robot-shop.availability
+      interval: 30s
+      rules:
+        - alert: RobotShopWebProbeFailing
+          expr: probe_success{job="robot-shop-web-probe"} == 0
+          for: 2m
+          labels:
+            severity: page
+            service: web
+          annotations:
+            summary: Robot Shop storefront synthetic check is failing
+            description: The synthetic GET / check has failed for at least two minutes.
+            runbook_url: https://github.com/<YOUR_GITHUB_OWNER>/<YOUR_REPOSITORY>/blob/<YOUR_BRANCH>/K8s/observability/runbooks/robot-shop-availability.md
+        - alert: RobotShopAvailabilitySLOBurn
+          expr: count_over_time(probe_success{job="robot-shop-web-probe"}[30d]) >= 86400 and (1 - avg_over_time(probe_success{job="robot-shop-web-probe"}[30d])) > 0.01
+          for: 5m
+          labels:
+            severity: warning
+            service: web
+          annotations:
+            summary: Robot Shop 30-day availability is below the 99% objective
+            description: More than 1% of synthetic checks failed in the rolling 30-day window.
+            runbook_url: https://github.com/<YOUR_GITHUB_OWNER>/<YOUR_REPOSITORY>/blob/<YOUR_BRANCH>/K8s/observability/runbooks/robot-shop-availability.md
+        - alert: RobotShopAvailabilityFastBurn
+          expr: count_over_time(probe_success{job="robot-shop-web-probe"}[5m]) >= 10 and count_over_time(probe_success{job="robot-shop-web-probe"}[1h]) >= 120 and (1 - avg_over_time(probe_success{job="robot-shop-web-probe"}[5m])) > 0.144 and (1 - avg_over_time(probe_success{job="robot-shop-web-probe"}[1h])) > 0.144
+          for: 2m
+          labels:
+            severity: page
+            service: web
+          annotations:
+            summary: Robot Shop is consuming its availability error budget rapidly
+            description: Synthetic probe failures exceeded 14.4% across both short and long windows.
+            runbook_url: https://github.com/<YOUR_GITHUB_OWNER>/<YOUR_REPOSITORY>/blob/<YOUR_BRANCH>/K8s/observability/runbooks/robot-shop-availability.md
+        - alert: RobotShopProbeMissing
+          expr: absent_over_time(probe_success{job="robot-shop-web-probe"}[5m])
+          for: 1m
+          labels:
+            severity: warning
+            service: web
+          annotations:
+            summary: Robot Shop availability probe has no recent samples
+            description: No synthetic probe samples were observed in the last five minutes; availability cannot be calculated.
+            runbook_url: https://github.com/<YOUR_GITHUB_OWNER>/<YOUR_REPOSITORY>/blob/<YOUR_BRANCH>/K8s/observability/runbooks/robot-shop-availability.md

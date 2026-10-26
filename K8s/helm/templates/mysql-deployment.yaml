@@ -1,3 +1,4 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,27 +14,38 @@ spec:
     metadata:
       labels:
         service: mysql
+      annotations:
+        checksum/mysql-config: {{ include (print $.Template.BasePath "/mysql-configmap.yaml") . | sha256sum }}
     spec:
       {{ if .Values.psp.enabled }}
       serviceAccountName: robot-shop
       {{ end }}
       containers:
-      - name: mysql
-        image: {{ .Values.image.repo }}/rs-mysql-db:{{ .Values.image.version }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        # added for Istio
-        securityContext:
-          capabilities:
-            add: ["NET_ADMIN"]
-        ports:
-        - containerPort: 3306
-        resources:
-          limits:
-            cpu: 200m
-            memory: 1024Mi
-          requests:
-            cpu: 100m
-            memory: 700Mi
+        - name: mysql
+          image: {{ .Values.image.repo }}/rs-mysql-db:{{ .Values.image.version }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # added for Istio
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-config
+              mountPath: /etc/mysql/conf.d/mysql-memory.cnf
+              subPath: mysql-memory.cnf
+              readOnly: true
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 3Gi
+            requests:
+              cpu: 200m
+              memory: 1Gi
+      volumes:
+        - name: mysql-config
+          configMap:
+            name: mysql-config
       restartPolicy: Always
       {{- with .Values.mysql.affinity }}
       affinity:

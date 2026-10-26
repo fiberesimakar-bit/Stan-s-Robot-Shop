@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  labels:
+    service: mysql
+data:
+  mysql-memory.cnf: |
+    [mysqld]
+    innodb_buffer_pool_size=256M
+    innodb_ft_total_cache_size=32M
+    max_connections=50
+    tmp_table_size=16M
+    max_heap_table_size=16M

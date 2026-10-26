@@ -22,6 +22,19 @@ const counter = new promClient.Counter({
     help: 'running count of items added to cart',
     registers: [register]
 });
+const httpRequests = new promClient.Counter({
+    name: 'http_requests_total',
+    help: 'Total HTTP requests handled by cart',
+    labelNames: ['method', 'route', 'status_code'],
+    registers: [register]
+});
+const httpRequestDuration = new promClient.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'HTTP request duration in seconds for cart',
+    labelNames: ['method', 'route', 'status_code'],
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+    registers: [register]
+});
 
 
 var redisConnected = false;
@@ -41,6 +54,23 @@ const expLogger = expPino({
 const app = express();
 
 app.use(expLogger);
+
+app.use((req, res, next) => {
+    const start = process.hrtime();
+    res.on('finish', () => {
+        const route = req.route && req.route.path ? `${req.baseUrl || ''}${req.route.path}` : 'unmatched';
+        const labels = {
+            method: req.method,
+            route,
+            status_code: String(res.statusCode)
+        };
+        const elapsed = process.hrtime(start);
+        const duration = elapsed[0] + elapsed[1] / 1e9;
+        httpRequests.inc(labels);
+        httpRequestDuration.observe(labels, duration);
+    });
+    next();
+});
 
 app.use((req, res, next) => {
     res.set('Timing-Allow-Origin', '*');
@@ -404,4 +434,3 @@ const port = process.env.CART_SERVER_PORT || '8080';
 app.listen(port, () => {
     logger.info('Started on port', port);
 });
-
