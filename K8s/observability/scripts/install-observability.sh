@@ -49,6 +49,12 @@ kubectl create configmap robot-shop-dashboard \
 kubectl apply -f "$OBS/logging/loki.yaml"
 kubectl apply -f "$OBS/logging/fluent-bit.yaml"
 kubectl apply -f "$OBS/tracing/jaeger.yaml"
+kubectl create configmap otel-collector-config \
+  --namespace observability \
+  --from-file=config.yaml="$OBS/tracing/collector-config.yaml" \
+  --dry-run=client \
+  --output=yaml | kubectl apply -f -
+kubectl apply -f "$OBS/tracing/otel-collector.yaml"
 
 if kubectl get secret robot-shop-slack --namespace monitoring >/dev/null 2>&1; then
   kubectl apply -f "$OBS/prometheus/alertmanager-config.yaml"
@@ -60,5 +66,6 @@ kubectl rollout status deployment/blackbox-exporter --namespace monitoring --tim
 kubectl rollout status deployment/loki --namespace observability --timeout=5m
 kubectl rollout status daemonset/fluent-bit --namespace monitoring --timeout=5m
 kubectl rollout status deployment/jaeger --namespace observability --timeout=5m
+kubectl rollout status deployment/otel-collector --namespace observability --timeout=5m
 
 printf '%s\n' "Observability resources installed. Follow the verification commands in K8s/observability/README.md; installation alone is not acceptance evidence."

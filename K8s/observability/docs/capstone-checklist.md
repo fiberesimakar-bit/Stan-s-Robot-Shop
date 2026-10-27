@@ -7,7 +7,7 @@
 - [x] Robot Shop Helm chart, Kubernetes manifests, and load generator are present.
 - [x] Cart and payment source expose business Prometheus metrics.
 - [x] The five Helm-injected `INSTANA_AGENT_HOST` entries are removed locally, as directed by the brief.
-- [x] Local dashboard-as-code, Prometheus/Blackbox configuration, Fluent Bit/Loki configuration, Jaeger receiver manifest, SLO policy, alert route, runbook, drill plan, postmortem template, and evidence index are present.
+- [x] Local dashboard-as-code, Prometheus/Blackbox configuration, Fluent Bit/Loki configuration, Jaeger receiver, local OTLP Collector template, SLO policy, alert route, runbook, drill plan, postmortem template, and evidence index are present.
 - [x] Cart and payment source now defines route-labelled HTTP request counters, response status codes, and duration histograms for the dashboard.
 - [x] A local validation script is present; see `SUBMISSION.md` for the actual run result.
 
@@ -22,7 +22,7 @@
 
 ## Blocked on instructor input or approved live actions
 
-- [ ] Trace a request using the instructor's original OpenTelemetry Collector configuration and Jaeger. No such config was found in the repository/workspace; do not substitute one.
+- [ ] Trace a request using OpenTelemetry and Jaeger. A local OTLP Collector template exists, but it is not the instructor's original configuration, and app OTLP instrumentation is not implemented. Exact instructor-specific compliance remains unmet.
 - [ ] Complete the instructor-led incident drill and fill the postmortem from observed evidence. No timing, cause, impact, alert delivery, or recovery result may be invented.
 - [ ] Replace/roll out MySQL only after its unknown ephemeral data state is addressed and the rollout is explicitly approved.
 - [ ] Resolve the Docker/Kind inventory discrepancy before relying on the current API context for deployment.
@@ -39,5 +39,5 @@
 ## Evidence boundaries
 
 - Local YAML/JSON/Helm validation is not a live deployment or runtime test.
-- The brief is supplied outside this repository; no separate rubric or instructor Collector file was found in the workspace.
+- The brief is supplied outside this repository; no separate rubric or instructor Collector file was found, and the user confirms no instructor materials are available. The included Collector is a local alternative, not the instructor's file.
 - No Helm upgrade, rollback, Kubernetes apply/delete, restart, backup, or cluster mutation has been performed in this task.

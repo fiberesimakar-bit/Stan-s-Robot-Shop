@@ -83,7 +83,7 @@ data:
         Match                     kube.*
         Host                      loki.observability.svc.cluster.local
         Port                      3100
-        Labels                    job=robot-shop,service=$service,level=$level,namespace=$kubernetes['namespace_name']
+        Labels                    job=robot-shop,service=$service,level=$level,namespace=$namespace
         Line_Format               json
 
   parsers.conf: |
@@ -119,6 +119,7 @@ data:
       local kubernetes = record["kubernetes"] or {}
       local pod_labels = kubernetes["labels"] or {}
       record["service"] = pod_labels["service"] or kubernetes["container_name"] or "unknown"
+      record["namespace"] = kubernetes["namespace_name"] or "unknown"
 
       local level = normalize_level(record["level"]) or normalize_level(record["severity"]) or normalize_level(record["log_level"])
       if not level then

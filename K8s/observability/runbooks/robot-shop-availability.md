@@ -2,7 +2,7 @@
 
 - **Alerts:** `RobotShopWebProbeFailing`, `RobotShopProbeMissing`, `RobotShopAvailabilitySLOBurn`, `RobotShopAvailabilityFastBurn`
 - **Scope:** Robot Shop in Kubernetes namespace `default`
-- **Status:** Draft until the runbook URL is published, rules are installed, and the instructor-approved drill verifies the alert route.
+- **Status:** Draft until rules are installed and an approved drill verifies the alert route. The published runbook URL is configured in the Prometheus rules.
 
 ## Symptoms and impact
 
@@ -41,7 +41,7 @@ kubectl logs -n default <pod-name> --all-containers --previous --tail=200
 
 Compare readiness, restart counts, termination reasons, Service endpoints, recent Events, requests/limits, and available metrics. If a workload is OOMKilled, capture its limit, last termination, timestamps, and cAdvisor evidence before proposing a change. The Metrics API may be absent; report that limitation instead of inventing usage.
 
-Check dependencies according to the failed request: MongoDB/catalogue, Redis/cart, MySQL/shipping, RabbitMQ/payment/dispatch. Do not infer that a dependent service is healthy only because its Pod is Running.
+Check dependencies according to the failed request: MongoDB/catalogue, Redis/cart, MySQL/ratings/shipping, and RabbitMQ/payment/dispatch. Do not infer that a dependent service is healthy only because its Pod is Running.
 
 ## 3. Escalation and safety limits
 
@@ -63,7 +63,7 @@ After an approved mitigation, verify each item before declaring recovery:
 4. A test transaction is successful if explicitly approved and dependencies are available.
 5. Prometheus target health and the alert state are correct; the alert resolves for the expected reason.
 6. Fluent Bit delivers logs searchable in Loki by `service` and `level`.
-7. A representative trace is visible in Jaeger if the instructor's Collector configuration and instrumentation are in place.
+7. A representative trace is visible in Jaeger only if a service has working OTLP instrumentation and exports through the local Collector or another approved Collector.
 8. No secret values or customer information appear in evidence.
 
 ## 5. Incident record

@@ -36,7 +36,7 @@ At 99.0%, the allowed failure fraction is 1.0%:
 
 ## Alert and response policy
 
-The local Prometheus rules detect a failed probe lasting two minutes, missing probe data for five minutes, a rolling 30-day SLI below 99%, and a rapid-burn condition with more than 14.4% probe failures in both 5-minute and 1-hour windows. The rules include a `runbook_url`; replace its repository placeholders before publishing or activating alerts.
+The local Prometheus rules detect a failed probe lasting two minutes, missing probe data for five minutes, a rolling 30-day SLI below 99%, and a rapid-burn condition with more than 14.4% probe failures in both 5-minute and 1-hour windows. Each rule links to the runbook in the personal GitHub repository's `main` branch. Recheck that URL if the repository or branch changes.
 
 When the error budget is exhausted, pause nonessential risky changes, prioritize restoring storefront availability and preserving data, and agree on corrective actions before resuming. For a page-level probe/fast-burn alert, acknowledge it and follow the [availability runbook](../runbooks/robot-shop-availability.md). The Slack route configuration is present locally, but delivery requires an instructor/project-owner-provided webhook Secret and must be verified during the approved incident drill.
 

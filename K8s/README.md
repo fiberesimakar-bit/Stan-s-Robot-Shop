@@ -53,4 +53,4 @@ Local Capstone 2 configuration and submission materials are in [`observability/`
 - [Read-only database/broker diagnosis](./observability/docs/runtime-diagnostics.md)
 - [Postmortem template](./observability/templates/postmortem.md)
 
-The monitoring, logging, tracing, and alert files are local configuration, not proof that services are deployed or healthy. The assignment requires the instructor's OpenTelemetry Collector configuration; it was not found in the workspace and must not be replaced. Complete the postmortem only after the instructor-led incident drill.
+The monitoring, logging, tracing, and alert files are local configuration, not proof that services are deployed or healthy. A local OTLP Collector template is included because the instructor's original configuration is unavailable; it must not be represented as instructor-provided, and Robot Shop OTLP instrumentation is not yet verified. Complete the postmortem only after the instructor-led incident drill.

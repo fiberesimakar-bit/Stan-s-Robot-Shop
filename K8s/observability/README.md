@@ -11,6 +11,7 @@ This directory contains **local, reproducible configuration**, not evidence of a
 | Loki | `logging/loki.yaml` | `3.4.2` |
 | Fluent Bit | `logging/fluent-bit.yaml` | `3.2.10` |
 | Jaeger all-in-one | `tracing/jaeger.yaml` | `1.65.0` |
+| OpenTelemetry Collector Contrib | `tracing/collector-config.yaml`, `tracing/otel-collector.yaml` | `0.116.1` |
 
 Versions are pinned to make the setup repeatable. Recheck upstream compatibility before changing these pins. The manifests are intended for a single-node local learning cluster, not production. Loki and Jaeger use ephemeral storage; their data is lost if their Pods are replaced.
 
@@ -33,8 +34,8 @@ Versions are pinned to make the setup repeatable. Recheck upstream compatibility
    ALLOW_CLUSTER_CHANGES=YES bash K8s/observability/scripts/install-observability.sh
    ```
 
-   The script installs kube-prometheus-stack, Blackbox Exporter, Loki, Fluent Bit, Jaeger, the dashboard, and Prometheus rules. It does not change Robot Shop application workloads. It exits without changes when `kind get clusters` does not list `robot-shop`.
-7. Configure Slack separately (see below) and provide the instructor's original OpenTelemetry Collector configuration before completing the trace requirement.
+   The script installs kube-prometheus-stack, Blackbox Exporter, Loki, Fluent Bit, Jaeger, the local OpenTelemetry Collector template, the dashboard, and Prometheus rules. It does not change Robot Shop application workloads. It exits without changes when `kind get clusters` does not list `robot-shop`.
+7. Configure Slack separately (see below). A local Collector template is included, but it is not instructor-provided. Trace verification also requires an application that exports OTLP spans; the current Robot Shop images do not yet have a verified OTLP instrumentation/export path.
 
 ## What is measured
 
@@ -91,7 +92,7 @@ Check that logs are actually returned and their labels are present before claimi
 
 ## Slack alerting
 
-The Prometheus rules are in `prometheus/robot-shop-rules.yaml`; the Alertmanager route template is in `prometheus/alertmanager-config.yaml`. Replace the GitHub owner/repository/branch placeholders in each alert's `runbook_url` with the real published location of the runbook. Do not leave the placeholders in a submission claiming an active runbook link.
+The Prometheus rules are in `prometheus/robot-shop-rules.yaml`; their `runbook_url` annotations link to the published runbook on the personal `main` branch. Confirm the URL remains correct if the repository or branch changes. The Alertmanager route template is in `prometheus/alertmanager-config.yaml`.
 
 Create a protected local file containing only the Slack incoming webhook URL, restrict its permissions, and create the Kubernetes Secret without putting the URL in Git:
 
@@ -111,11 +112,13 @@ kubectl apply -f K8s/observability/prometheus/alertmanager-config.yaml
 
 Only do this after cluster approval. Never paste the URL in a terminal transcript or evidence. Verify the AlertmanagerConfig is accepted, the alert reaches firing state in Prometheus/Alertmanager, and the expected Slack channel receives the notification. The installer skips the Slack route if the Secret is absent.
 
-## Tracing and instructor-provided configuration
+## Tracing and the local Collector template
 
-`tracing/jaeger.yaml` provides Jaeger UI and OTLP receiver endpoints (`jaeger.observability.svc.cluster.local:4317` gRPC and `:4318` HTTP). The assignment requires use of the **instructor-provided OpenTelemetry Collector configuration**. That file was not found in the repository/workspace. No substitute Collector configuration is included. Robot Shop source also contains Instana instrumentation, not a verified OpenTelemetry SDK/exporter pipeline.
+`tracing/jaeger.yaml` provides Jaeger UI and OTLP receiver endpoints (`jaeger.observability.svc.cluster.local:4317` gRPC and `:4318` HTTP). `tracing/collector-config.yaml` plus `tracing/otel-collector.yaml` form a clearly labeled local OpenTelemetry Collector Contrib template. It accepts OTLP gRPC/HTTP spans and exports them to Jaeger over OTLP. It is **not the instructor-provided configuration**; the user confirmed that the instructor file and setup instructions are unavailable. The original brief explicitly asks for the instructor's config, so using this alternative cannot be represented as exact compliance with that item.
 
-Obtain the original Collector file and any required endpoint/credentials from the instructor. Preserve its contents and provenance, validate it, deploy it only after approval, then generate a representative storefront request and verify the trace and service/span details in Jaeger. Do not claim tracing works from Jaeger being Ready alone.
+The Collector is an OTLP receiver/exporter, not an application instrumentor. Robot Shop source currently has Instana instrumentation, not a verified OpenTelemetry SDK/exporter path. An app image must be instrumented and rebuilt before a representative app request will generate spans for Jaeger. This package does not claim that a trace exists or that the Collector config was runtime-validated. The template uses unauthenticated OTLP inside the cluster; do not expose its Service outside the cluster without adding appropriate access controls.
+
+For a future approved test, configure the instrumented service exporter to use `http://otel-collector.observability.svc.cluster.local:4318` (OTLP/HTTP) or `otel-collector.observability.svc.cluster.local:4317` (OTLP/gRPC). Validate the file with the same Collector Contrib version, deploy only after approval, send one representative request, and verify its service/spans in Jaeger. Do not claim tracing works from successful static parsing or a Ready Collector Pod alone.
 
 ## Validation and troubleshooting
 
@@ -136,7 +139,7 @@ kubectl logs -n monitoring daemonset/fluent-bit --tail=100
 kubectl logs -n observability deployment/loki --tail=100
 ```
 
-If Prometheus has no web probe target, inspect the Blackbox Exporter target/config, DNS/service endpoints, Prometheus targets, and scrape errors. If logs do not appear, inspect Fluent Bit parser/filter/output errors, RBAC, Loki readiness, and port 3100 connectivity; query `{service="unknown"}` while checking labels. For no traces, obtain/validate the instructor config, check the Collector exporter endpoint and instrumentation, and inspect Collector/Jaeger logs. Never include secret values in captured output.
+If Prometheus has no web probe target, inspect the Blackbox Exporter target/config, DNS/service endpoints, Prometheus targets, and scrape errors. If logs do not appear, inspect Fluent Bit parser/filter/output errors, RBAC, Loki readiness, and port 3100 connectivity; query `{service="unknown"}` while checking labels. For no traces, check app instrumentation/exporter status, the Collector receiver/exporter endpoint, and Collector/Jaeger logs. Never include secret values in captured output.
 
 ## Removal / cleanup precautions
 

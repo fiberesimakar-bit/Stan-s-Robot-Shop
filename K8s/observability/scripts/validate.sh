@@ -47,6 +47,7 @@ assert len(ids) == len(set(ids)), "dashboard panel IDs must be unique"
 expressions = [target["expr"] for panel in dashboard["panels"] for target in panel.get("targets", [])]
 assert any("http_requests_total" in expr for expr in expressions)
 assert any("http_request_duration_seconds_bucket" in expr for expr in expressions)
+assert any("sum by (service)" in expr and 'status_code=~"5.."' in expr for expr in expressions)
 assert all(panel.get("datasource", {}).get("uid") == "prometheus" for panel in dashboard["panels"])
 print(f"PASS: dashboard JSON ({len(dashboard['panels'])} panels, unique IDs)")
 
@@ -68,6 +69,10 @@ probe_config = prom_values["prometheus"]["prometheusSpec"]["additionalScrapeConf
 assert probe_config["job_name"] == "robot-shop-web-probe"
 assert probe_config["static_configs"][0]["targets"] == ["http://web.default.svc.cluster.local:8080/"]
 assert probe_config["relabel_configs"][-2]["replacement"] == "blackbox-exporter.monitoring.svc.cluster.local:9115"
+blackbox_docs = parsed[obs / "prometheus/blackbox.yaml"]
+blackbox_deployment = next(doc for doc in blackbox_docs if doc and doc.get("kind") == "Deployment")
+blackbox_service = next(doc for doc in blackbox_docs if doc and doc.get("kind") == "Service")
+assert blackbox_service["spec"]["selector"] == blackbox_deployment["spec"]["selector"]["matchLabels"]
 datasources = prom_values["grafana"]["additionalDataSources"]
 loki_datasource = next((source for source in datasources if source.get("type") == "loki"), None)
 assert loki_datasource is not None, "Grafana Loki datasource is missing"
@@ -85,10 +90,12 @@ assert alert_names == {
     "RobotShopProbeMissing",
 }
 assert all(rule["annotations"].get("runbook_url") for group in rule_docs[0]["spec"]["groups"] for rule in group["rules"])
+expected_runbook = "https://github.com/fiberesimakar-bit/Stan-s-Robot-Shop/blob/main/K8s/observability/runbooks/robot-shop-availability.md"
+assert all(rule["annotations"]["runbook_url"] == expected_runbook for group in rule_docs[0]["spec"]["groups"] for rule in group["rules"])
 alertmanager_config = next(doc for doc in yaml.safe_load_all((obs / "prometheus/alertmanager-config.yaml").read_text()) if doc)
 slack = alertmanager_config["spec"]["receivers"][0]["slackConfigs"][0]
 assert slack["apiURL"] == {"name": "robot-shop-slack", "key": "slack_api_url"}
-print("PASS: Prometheus alert rules and Slack Secret reference")
+print("PASS: Prometheus alert rules, published runbook URL, and Slack Secret reference")
 
 blackbox_doc = next(doc for doc in parsed[obs / "prometheus/blackbox.yaml"] if doc and doc.get("kind") == "ConfigMap")
 yaml.safe_load(blackbox_doc["data"]["blackbox.yml"])
@@ -98,12 +105,15 @@ assert loki_config["schema_config"]["configs"][0]["store"] == "tsdb"
 print("PASS: embedded Blackbox and Loki configuration YAML")
 
 fluentbit_docs = parsed[obs / "logging/fluent-bit.yaml"]
-fluent_config = next(doc for doc in fluentbit_docs if doc and doc.get("kind") == "ConfigMap")["data"]["fluent-bit.conf"]
+fluent_config_map = next(doc for doc in fluentbit_docs if doc and doc.get("kind") == "ConfigMap")
+fluent_config = fluent_config_map["data"]["fluent-bit.conf"]
+normalize_lua = fluent_config_map["data"]["normalize.lua"]
 for section in ("[INPUT]", "[FILTER]", "[OUTPUT]"):
     assert section in fluent_config, f"Fluent Bit config missing {section}"
 assert "Name                      loki" in fluent_config, "Fluent Bit Loki output is missing"
-assert "service=$service" in fluent_config and "level=$level" in fluent_config
+assert "service=$service" in fluent_config and "level=$level" in fluent_config and "namespace=$namespace" in fluent_config
 assert "Host                      loki.observability.svc.cluster.local" in fluent_config
+assert 'record["namespace"] = kubernetes["namespace_name"] or "unknown"' in normalize_lua
 print("PASS: Fluent Bit pipeline and service/level label checks")
 
 mysql_source = (root / "K8s/helm/files/mysql-memory.cnf").read_text().strip()
@@ -121,9 +131,56 @@ assert "PAYMENT_GATEWAY" in rendered and "https://example.invalid" in rendered
 assert "INSTANA_EUM_KEY" in rendered and "INSTANA_EUM_REPORTING_URL" in rendered
 print("PASS: Helm render assertions, MySQL ConfigMap parity, and preserved optional settings")
 
+collector_docs = [doc for doc in yaml.safe_load_all((obs / "tracing/otel-collector.yaml").read_text()) if doc]
+collector_config = yaml.safe_load((obs / "tracing/collector-config.yaml").read_text())
+trace_pipeline = collector_config["service"]["pipelines"]["traces"]
+assert trace_pipeline["receivers"] == ["otlp"]
+assert trace_pipeline["exporters"] == ["otlp/jaeger"]
+assert collector_config["exporters"]["otlp/jaeger"]["endpoint"] == "jaeger.observability.svc.cluster.local:4317"
+assert any(doc.get("kind") == "Service" and doc["metadata"]["name"] == "otel-collector" for doc in collector_docs)
+collector_deployment = next(doc for doc in collector_docs if doc.get("kind") == "Deployment")
+assert any(volume.get("configMap", {}).get("name") == "otel-collector-config" for volume in collector_deployment["spec"]["template"]["spec"]["volumes"])
+assert collector_deployment["spec"]["template"]["spec"]["containers"][0]["image"] == "otel/opentelemetry-collector-contrib:0.116.1"
 assert (obs / "tracing/jaeger.yaml").exists()
-assert not list(root.rglob("*collector*.yaml")), "unexpected Collector file: verify it is instructor-provided before use"
-print("PASS: Jaeger manifest present; no unverified Collector config will be mistaken for the instructor file")
+assert "instructor-provided" in (obs / "tracing/README.md").read_text()
+jaeger_docs = [doc for doc in yaml.safe_load_all((obs / "tracing/jaeger.yaml").read_text()) if doc]
+jaeger_service = next(doc for doc in jaeger_docs if doc.get("kind") == "Service")
+jaeger_ports = {port["name"]: port["port"] for port in jaeger_service["spec"]["ports"]}
+assert jaeger_ports["otlp-grpc"] == 4317 and jaeger_ports["otlp-http"] == 4318
+print("PASS: local OTLP Collector pipeline and Jaeger endpoint configuration (static checks only)")
+
+markdown_paths = [
+    root / "SUBMISSION.md",
+    root / "K8s/README.md",
+    *sorted(obs.rglob("*.md")),
+    *sorted((root / "submission").rglob("*.md")),
+]
+missing_links = []
+for markdown_path in markdown_paths:
+    for target in re.findall(r"\[[^]]+\]\(([^)]+)\)", markdown_path.read_text()):
+        if "://" in target or target.startswith(("#", "mailto:")):
+            continue
+        local_target = target.split("#", 1)[0].split("?", 1)[0]
+        if local_target and not (markdown_path.parent / local_target).resolve().exists():
+            missing_links.append((markdown_path, target))
+assert not missing_links, f"broken relative Markdown links: {missing_links}"
+print(f"PASS: relative Markdown links ({len(markdown_paths)} documents)")
+
+placeholder_paths = [
+    root / "SUBMISSION.md",
+    root / "K8s",
+    root / "submission",
+]
+placeholder_matches = []
+for base in placeholder_paths:
+    candidates = [base] if base.is_file() else base.rglob("*")
+    for path in candidates:
+        if path.is_file() and path.suffix in {".md", ".yaml", ".yml", ".json"}:
+            text = path.read_text()
+            if re.search(r"<YOUR_[^>]+>|CHANGE_ME|REPLACE_ME", text):
+                placeholder_matches.append(str(path))
+assert not placeholder_matches, f"unresolved submission placeholders: {placeholder_matches}"
+print("PASS: no unresolved submission placeholders")
 
 payment_source = (root / "payment/payment.py").read_text()
 compile(payment_source, str(root / "payment/payment.py"), "exec")

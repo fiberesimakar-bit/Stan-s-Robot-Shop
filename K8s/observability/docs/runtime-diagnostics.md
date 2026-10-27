@@ -1,6 +1,15 @@
 # Runtime Diagnosis — MySQL, RabbitMQ, Ratings, Shipping
 
-**Observation snapshot:** 2026-10-26. These are read-only observations. No workload was restarted or changed for this report.
+**Observation snapshot:** 2026-10-27 (read-only audit, latest check). No workload was restarted or changed for this report. Counts and readiness can change; rerun the documented checks before taking action.
+
+## Latest read-only workload findings
+
+- The Kubernetes API responds through context `kind-robot-shop`, and the `robot-shop-control-plane` node reports `Ready`, but `kind get clusters` reports no Kind clusters. Do not reconcile this by deleting/recreating a cluster; establish which runtime owns the API first.
+- At the latest check, MySQL had 119 restarts and RabbitMQ had 136; MySQL's latest termination was `OOMKilled`/137 and RabbitMQ remained in `CrashLoopBackOff`. Previous-container MySQL logs returned only a startup-banner line; RabbitMQ returned no useful prior log lines.
+- Ratings and shipping were not Ready. Ratings' previous logs contained repeated connection-refused/database error patterns; its source config uses `mysql` for its PDO host. Shipping's previous logs also contained connection-refused/database error patterns; its Java config defaults `DB_HOST` to `mysql`. Together with MySQL's crash loop, this supports unavailable MySQL as a likely contributor to ratings/shipping failures. It does not establish MySQL's OOM root cause.
+- The only PVC listed in namespace `default` was `data-redis-0`; no MySQL PVC was listed. This is not proof the MySQL data directory is empty.
+- No workloads were present in `monitoring` or `observability`, so Prometheus/Grafana, Fluent Bit/Loki, Jaeger, and the local Collector had not been deployed.
+- Warning events included MySQL endpoint/EndpointSlice update failures with `Unauthorized`, plus MySQL/RabbitMQ BackOff and ratings/shipping readiness failures. The authorization warnings may be a separate control-plane/authentication issue; their cause is not established by the event text.
 
 ## MySQL
 
@@ -50,9 +59,9 @@ The ConfigMap is mounted through `subPath`; changing its data alone does not upd
 
 ## Ratings and shipping
 
-- Ratings Pods are not Ready and the readiness endpoint returned HTTP 500 in the observed snapshot.
-- Shipping Pods are not Ready; the readiness probe could not connect to port 8080, and a prior container termination had exit code 1/reason `Error`.
-- The available evidence does not establish the root cause for either application. Dependency failure may contribute, but must be confirmed from application logs and service-specific health checks.
+- Ratings Pods are not Ready and the readiness endpoint returned HTTP 500. Its service source config targets MySQL at `mysql`; previous logs showed repeated connection-refused/database error patterns.
+- Shipping Pods are not Ready; the readiness probe could not connect to port 8080, and a prior container termination had exit code 1/reason `Error`. Its Java JDBC config defaults `DB_HOST` to `mysql`; previous logs showed connection-refused/database error patterns.
+- MySQL unavailability is a likely dependency cause for both services, supported by source configuration and previous-log summaries. Confirm with fresh, redacted logs after MySQL is stably available. Do not claim their failures are fully resolved until health checks pass.
 
 ## Evidence to collect at next approved diagnostic window
 

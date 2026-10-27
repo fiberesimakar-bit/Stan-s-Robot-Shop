@@ -8,7 +8,7 @@ Robot Shop is a Helm-managed Kubernetes microservices store. Its workload set in
 
 - Prometheus/Grafana with a Robot Shop dashboard, a Blackbox synthetic probe, and SLO alerts.
 - Fluent Bit collection and Kubernetes metadata enrichment, with Loki storage/querying.
-- Jaeger OTLP receiver endpoints for traces sent through the instructor-supplied OpenTelemetry Collector configuration.
+- Jaeger and a local OpenTelemetry Collector Contrib template for OTLP traces. The template is not instructor-provided, and Robot Shop OTLP instrumentation remains incomplete.
 - A measurable availability objective, error-budget policy, Slack alert route, runbook, instructor-led incident drill, and evidence-based blameless postmortem.
 
 The observability configurations target a local Kind cluster and use pinned component versions. Loki and Jaeger storage are intentionally ephemeral for this local demo. They are not production-hardened.
@@ -25,13 +25,13 @@ Status meanings: **Local complete** means the artifact exists and its stated sta
 | Remove Instana agent settings | Five workload Helm templates under `K8s/helm/templates/` | Removed five `INSTANA_AGENT_HOST` chart env entries locally | Rendered chart asserted no `INSTANA_AGENT_HOST`; optional payment/EUM settings retained | Deployment/runtime evidence remains | Yes, local edit is complete; runtime verification is not |
 | kube-prometheus-stack and requests/errors/latency dashboard-as-code | `K8s/observability/prometheus/`, `cart/server.js`, `payment/payment.py` | Pinned chart values, service scrape config, Blackbox probe, dashboard JSON, alerts, and route-labelled HTTP request/5xx/latency instrumentation for cart/payment added | Dashboard JSON/panel IDs and YAML syntax validated; Helm templates lint/render; Python syntax validated; Node syntax check unavailable in this environment | Rebuild images and install after approval. Other services remain uninstrumented; synthetic probe panels are distinguished from application traffic | Partly: source/config locally; runtime and images need cluster approval |
 | Fluent Bit logs to Loki; searchable by service and level | `K8s/observability/logging/` | Loki and Fluent Bit manifests, CRI parser, Kubernetes metadata filter, normalized severity, labels, and LogQL examples added | Static YAML and pipeline/label checks passed | Install only after cluster approval; prove results for multiple services/levels | Partly: manifests locally; runtime requires approved cluster |
-| Trace a request using instructor's OpenTelemetry config and Jaeger | `K8s/observability/tracing/jaeger.yaml`, tracing README | Jaeger UI/OTLP endpoints and verification path prepared; no Collector substitute added | Jaeger YAML static validation only | Instructor's original Collector file is absent; obtain it and verify instrumentation/export | No: instructor input and approved runtime required |
+| Trace a request through OpenTelemetry and Jaeger | `K8s/observability/tracing/jaeger.yaml`, `collector-config.yaml`, `otel-collector.yaml`, tracing README | Jaeger plus a clearly labeled local OTLP receiver/exporter template added; no instructor configuration is claimed | YAML syntax and static pipeline/endpoint assertions only; no Collector binary validation or live trace | Application OTLP instrumentation and app image rebuild are not implemented. Instructor's required original Collector configuration is unavailable, so exact brief compliance cannot be claimed | Partly: local receiver config exists; instrumentation and runtime evidence do not |
 | Availability SLO and error-budget policy | `K8s/observability/docs/availability-slo.md` | 99.0% proposed 30-day synthetic SLI, 30s cadence, 5s timeout, and calculations documented | PromQL and 7h12m/864-probe budget arithmetic reviewed | Target approval and live measurement pending; missing probe data is not healthy | Policy locally drafted; target approval/live measurement are not |
-| Slack alert that links runbook | `prometheus/robot-shop-rules.yaml`, `prometheus/alertmanager-config.yaml`, runbook | Probe, missing-data, burn alerts, and Slack route with runbook placeholder added; no webhook secret committed | Static config checks only | Publish runbook URL, obtain Slack webhook securely, install Secret/route, and prove firing/delivery | Partly: config locally; webhook and live drill require instructor/owner |
+| Slack alert that links runbook | `prometheus/robot-shop-rules.yaml`, `prometheus/alertmanager-config.yaml`, runbook | Probe, missing-data, and burn alerts link to the published personal-repository runbook; Slack route references a Secret name/key and no webhook is committed | Static checks verify all rule URLs match the published runbook path and the Secret reference shape | Provision a real webhook Secret securely, install the route, and prove firing/delivery | Partly: config locally; webhook and live drill require approved runtime |
 | Instructor-led incident drill and blameless postmortem | `docs/incident-drill-plan.md`, `templates/incident-drill-record.md`, `templates/postmortem.md` | Plan, abort conditions, evidence fields, timeline, and postmortem template prepared | Template/document presence | Complete approved drill and write from observed evidence; do not invent impact/root cause | No: instructor-led drill required |
 | Hand-in artifacts: dashboard-as-code, logging/tracing config, SLO policy, postmortem | `K8s/observability/`, `submission/evidence/` | Local configurations, evidence index, and templates assembled | Local static validation | Capture runtime proof; Collector provenance and completed postmortem remain missing | Partly: artifacts locally; runtime evidence needs approved environment |
 
-The exact document to request if not already available is the **instructor-provided OpenTelemetry Collector configuration** plus any associated non-secret endpoint/credential provisioning instructions. No other separate rubric/checklist document was present in the repository/workspace.
+The user confirmed that no additional instructor files or setup instructions are available. A compatible local Collector template is included as a best-effort alternative, but the instructor-specific config requirement remains unmet. No separate rubric/checklist document was found in the repository/workspace.
 
 ## Deliverables and locations
 
@@ -40,7 +40,7 @@ The exact document to request if not already available is the **instructor-provi
 - [Robot Shop Grafana dashboard JSON](K8s/observability/prometheus/robot-shop-dashboard.json)
 - [Prometheus scrape probe and alert rules](K8s/observability/prometheus/blackbox.yaml), [robot-shop-rules.yaml](K8s/observability/prometheus/robot-shop-rules.yaml), [Alertmanager Slack route](K8s/observability/prometheus/alertmanager-config.yaml)
 - [Loki](K8s/observability/logging/loki.yaml) and [Fluent Bit](K8s/observability/logging/fluent-bit.yaml) configuration
-- [Jaeger receiver](K8s/observability/tracing/jaeger.yaml); instructor Collector configuration remains required
+- [Jaeger receiver](K8s/observability/tracing/jaeger.yaml), [local OTLP Collector configuration](K8s/observability/tracing/collector-config.yaml), and [Collector deployment](K8s/observability/tracing/otel-collector.yaml); app instrumentation and runtime tracing remain incomplete
 - [SLO/error-budget policy](K8s/observability/docs/availability-slo.md), [availability runbook](K8s/observability/runbooks/robot-shop-availability.md)
 - [Incident drill plan](K8s/observability/docs/incident-drill-plan.md), [drill record template](K8s/observability/templates/incident-drill-record.md), and [postmortem template](K8s/observability/templates/postmortem.md)
 - [Read-only MySQL/RabbitMQ diagnosis and data-safe next steps](K8s/observability/docs/runtime-diagnostics.md)
@@ -89,7 +89,7 @@ Use the [evidence index](submission/evidence/README.md). At minimum capture:
 2. Successful storefront and approved transaction/load test output.
 3. Grafana dashboard with time range, Prometheus target state, and requests/errors/latency panels populated (explain synthetic vs application metrics). Build and deploy updated cart/payment images first for the new app metrics.
 4. Loki results for at least two `service` values and `level` values, with the exact LogQL query and timestamp.
-5. A representative request trace in Jaeger using the instructor's original Collector configuration; record provenance and private trace reference.
+5. A representative request trace in Jaeger through the clearly labeled local Collector alternative; record its project-created provenance and private trace reference. This does not satisfy the exact instructor-config wording.
 6. SLO query/window, alert rule state, Slack delivery (redacted), and clickable published runbook URL.
 7. Instructor-authorized drill timestamps, decisions, evidence, recovery verification, and a completed blameless postmortem.
 
@@ -105,12 +105,12 @@ Do not stage empty templates as proof that a test passed. Preserve actual output
 - Prometheus scrapes cart/payment `/metrics` and a synthetic web probe. Local cart/payment source instrumentation must be rebuilt and deployed before the HTTP panels can return application data; other services remain uninstrumented.
 - Fluent Bit/Loki, dashboard, rules, Slack, Jaeger, and drill have not been applied or runtime-verified.
 - Loki uses local ephemeral storage, and Jaeger all-in-one storage is not durable.
-- The instructor's Collector config and Slack webhook are not included. Never substitute a secret or claim those requirements complete without the official input and observed delivery.
+- The instructor's Collector config and Slack webhook are unavailable. The local Collector alternative is not instructor-provided; do not claim exact compliance or Slack delivery without genuine evidence.
 
 ## Shortest safe next actions
 
 1. Run `bash K8s/observability/scripts/validate.sh` and retain its output.
-2. Obtain the instructor's Collector config and confirm the SLO target, Slack alert channel, and drill scenario.
+2. The instructor Collector file is unavailable. Use the documented local template only as a transparent alternative; confirm the SLO target, Slack setup, and drill scenario with the instructor if possible.
 3. Resolve the Docker/Kind inventory mismatch read-only; preserve current contexts/resources and database data.
 4. Get explicit approval and a MySQL data-preservation decision before any application rollout. Diagnose RabbitMQ separately from MySQL.
 5. After approval and stable capacity, install observability with the guarded script, configure Slack Secret from a protected file, and verify every target/query/alert/trace.

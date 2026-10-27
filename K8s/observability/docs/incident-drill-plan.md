@@ -15,7 +15,7 @@
 - Instructor/incident lead provides the scenario, start signal, allowed actions, stop conditions, and participants.
 - Cluster context and Kind/Docker inventory identify the same intended cluster.
 - Robot Shop baseline is healthy enough for the agreed scenario; MySQL state and backup/restore constraints are understood.
-- Dashboard, Prometheus rule, Alertmanager, Slack Secret/route, Fluent Bit, Loki, Jaeger, and the instructor's original Collector configuration are installed and verified as applicable.
+- Dashboard, Prometheus rule, Alertmanager, Slack Secret/route, Fluent Bit, Loki, Jaeger, and the local Collector alternative are installed and verified as applicable. Clearly record that the local Collector is not instructor-provided; verify app OTLP instrumentation separately.
 - Capture storage and observer are assigned; redact secrets and customer data from evidence.
 - Rollback and abort criteria are agreed before the drill. No PVC, database, namespace, or cluster deletion is part of this plan.
 

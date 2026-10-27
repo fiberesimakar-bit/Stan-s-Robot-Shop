@@ -33,6 +33,15 @@ $ helm install --set image.version=0.1.2 ...
 
 It is recommened to always use the latest version.
 
+### Data-safety warning for local deployments
+
+The chart's MySQL and RabbitMQ workloads do not declare persistent volumes. Do not
+upgrade, reinstall, delete, or replace those Pods when they contain data unless
+the data location and an approved backup/recovery plan have first been established.
+The Redis StatefulSet is the only workload in the default chart values that requests
+a PVC. A Pod restart is not a backup, and the MySQL image's `/data` volume is not
+automatically persistent merely because the image declares it.
+
 ## Pod Security Policy
 
 If you wish to enable [PSP](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)

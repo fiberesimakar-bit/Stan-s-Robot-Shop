@@ -8,13 +8,18 @@ Use [capture-template.md](./capture-template.md) to record each dashboard, log-s
 
 | ID | Requirement | Evidence to capture | Current state |
 |---|---|---|---|
-| E01 | Correct cluster/application baseline | `kubectl config current-context`, `kind get clusters`, node and workload readiness output with timestamp | Pending; Docker/Kind inventory mismatch; several workloads unhealthy |
+| E01 | Correct cluster/application baseline | `kubectl config current-context`, `kind get clusters`, node and workload readiness output with timestamp | Read-only observation completed; no timestamped evidence artifact is stored. Context is reachable but Kind reports no cluster, and several workloads are unhealthy. Capture approved output only after cluster ownership is resolved. |
 | E02 | Application and load | Storefront browser screenshot, approved load-generator parameters, successful request/transaction output | Pending; do not run load until backend health and resource capacity are confirmed |
 | E03 | Prometheus/Grafana dashboard | Grafana dashboard screenshot with time range; Prometheus target status; panel queries and no-data explanations | Configuration local; live deployment pending |
 | E04 | Logs in Loki | LogQL query/result demonstrating at least two service values and normalized `level` labels | Configuration local; live ingestion/search pending |
-| E05 | Trace in Jaeger | Instructor Collector provenance/config identity (no secret values), request description, Jaeger trace screenshot and trace ID in private evidence store | Blocked on instructor config and runtime |
+| E05 | Trace in Jaeger | Identify local Collector template as project-created (not instructor-provided); request description, Jaeger trace screenshot and trace ID in private evidence store | Blocked on app OTLP instrumentation, approved runtime, and trace capture; exact instructor-config requirement cannot be met with current materials |
 | E06 | SLO and Slack alert | SLO query/window, alert rule firing/resolved status, redacted delivery screenshot, runbook link | Configuration local; webhook and live firing pending |
-| E07 | Incident drill/postmortem | Instructor-approved drill record, timestamped evidence, completed blameless postmortem | Pending instructor-led drill |
+| E07 | Incident drill/postmortem | Instructor-approved drill record, timestamped evidence, completed blameless postmortem | Blocked; no instructor-led drill has occurred and no incident result is claimed |
+
+The current state labels are deliberately conservative: configuration can be
+validated locally, but it is not runtime evidence. The read-only observations
+above are diagnostic context only and must be recaptured as timestamped,
+redacted evidence in the approved runtime environment.
 
 ## Capture template
 
